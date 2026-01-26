@@ -2,9 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <!-- Empêche le zoom (pinch, double-tap, etc.) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <title>Video Ad Player</title>
+    <title>Pub.Adam_D'H7</title>
     <style>
         body, html {
             margin: 0;
@@ -18,7 +17,6 @@
             justify-content: center;
             align-items: center;
             color: white;
-            /* Empêche certains comportements de scroll/refresh sur mobile */
             overscroll-behavior: none;
         }
 
@@ -69,6 +67,22 @@
             font-size: 20px;
         }
 
+        #sound-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid white;
+            z-index: 10;
+            cursor: pointer;
+        }
+
         #cta-btn {
             position: absolute;
             bottom: 60px;
@@ -111,11 +125,11 @@
 <body>
 
     <div id="ad-container">
-        <div id="close-btn">--</div>
+        <div id="close-btn"></div>
+        <div id="sound-btn"></div>
         
         <div id="media-wrapper"></div>
 
-        <!-- target="_blank" + rel pour forcer nouvel onglet même en iframe -->
         <a id="cta-btn" href="#" target="_blank" rel="noopener noreferrer">Click Here</a>
         
         <div id="progress-container">
@@ -130,15 +144,33 @@
             en: "Click here"
         };
 
+        const mutedSVG = '<svg xmlns="http://www.w3.org/2000/svg" height="32" viewBox="0 0 24 24" width="32" fill="white"><path d="M0 0h24v24H0z" fill="none"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+
+        const unmutedSVG = '<svg xmlns="http://www.w3.org/2000/svg" height="32" viewBox="0 0 24 24" width="32" fill="white"><path d="M0 0h24v24H0z" fill="none"/><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.73 2.5-2.25 2.5-4.03zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+
         const availableLangs = ['fr', 'es', 'en'];
         const defaultLang = 'en';
 
         const container = document.getElementById('ad-container');
         const mediaWrapper = document.getElementById('media-wrapper');
         const closeBtn = document.getElementById('close-btn');
+        const soundBtn = document.getElementById('sound-btn');
         const ctaBtn = document.getElementById('cta-btn');
         const progressBar = document.getElementById('progress-bar');
         const progressContainer = document.getElementById('progress-container');
+
+        closeBtn.style.display = 'none';
+        soundBtn.style.display = 'none';
+        progressContainer.style.display = 'none';
+
+        function showOverlays(isVideo) {
+            closeBtn.style.display = 'flex';
+            soundBtn.style.display = isVideo ? 'flex' : 'none';
+            if (ctaBtn.href !== '#') {
+                ctaBtn.style.display = 'block';
+            }
+            progressContainer.style.display = isVideo ? 'block' : 'none';
+        }
 
         function getLanguage() {
             const userLang = navigator.language || navigator.userLanguage; 
@@ -173,13 +205,12 @@
             if (item.link) {
                 ctaBtn.href = item.link;
                 ctaBtn.textContent = translations[lang];
-                ctaBtn.style.display = "block";
-                
-                // ON NE FORCE PLUS window.location.href → on laisse le <a target="_blank"> faire son travail (nouvel onglet)
             }
 
             const videoExtensions = ['.mp4','.mov','.mkv','.webm','.avi','.ogg','.flv','.wmv','.3gp','.m4v','.mpg','.mpeg'];
             const isVideo = item.type === 'video' || videoExtensions.some(ext => item.url.toLowerCase().endsWith(ext));
+
+            mediaWrapper.innerHTML = '';
 
             if (isVideo) {
                 setupVideo(item);
@@ -193,11 +224,31 @@
             video.src = item.url;
             video.autoplay = true;
             video.playsInline = true;
-            video.muted = false;
-
-            video.play();
+            video.muted = true;
+            video.controls = false;
+            video.preload = 'auto';
 
             mediaWrapper.appendChild(video);
+
+            function updateSoundIcon() {
+                soundBtn.innerHTML = video.muted ? mutedSVG : unmutedSVG;
+            }
+
+            updateSoundIcon();
+
+            let overlaysShown = false;
+
+            video.addEventListener('playing', () => {
+                if (!overlaysShown) {
+                    showOverlays(true);
+                    updateSoundIcon();
+                    if (video.duration && !isNaN(video.duration)) {
+                        const initialTimeLeft = Math.ceil(video.duration - video.currentTime);
+                        closeBtn.innerText = initialTimeLeft + "s";
+                    }
+                    overlaysShown = true;
+                }
+            });
 
             video.ontimeupdate = () => {
                 const percent = video.duration ? (video.currentTime / video.duration) * 100 : 0;
@@ -214,9 +265,12 @@
                 progressBar.style.width = "100%";
             };
 
+            video.play().catch(() => {});
+
             const unlockAudio = () => {
                 video.muted = false;
-                video.play();
+                video.play().catch(() => {});
+                updateSoundIcon();
                 document.body.removeEventListener('click', unlockAudio);
                 document.body.removeEventListener('touchstart', unlockAudio);
             };
@@ -224,31 +278,44 @@
             document.body.addEventListener('click', unlockAudio);
             document.body.addEventListener('touchstart', unlockAudio);
 
-            video.onmousedown = () => container.classList.add('shrink');
-            video.onmouseup = () => container.classList.remove('shrink');
-            video.ontouchstart = () => container.classList.add('shrink');
-            video.ontouchend = () => container.classList.remove('shrink');
+            soundBtn.onclick = (e) => {
+                e.stopPropagation();
+                video.muted = !video.muted;
+                if (!video.muted) {
+                    video.play().catch(() => {});
+                }
+                updateSoundIcon();
+            };
+
+            const shrinkStart = () => container.classList.add('shrink');
+            const shrinkEnd = () => container.classList.remove('shrink');
+
+            video.addEventListener('mousedown', shrinkStart);
+            video.addEventListener('mouseup', shrinkEnd);
+            video.addEventListener('touchstart', shrinkStart);
+            video.addEventListener('touchend', shrinkEnd);
         }
 
         function setupImage(item) {
             const img = document.createElement('img');
             img.src = item.url;
             mediaWrapper.appendChild(img);
-            
-            progressContainer.style.display = 'none';
 
-            let timeLeft = 3;
-            closeBtn.innerText = timeLeft + "s";
+            img.onload = () => {
+                showOverlays(false);
+                let timeLeft = 3;
+                closeBtn.innerText = timeLeft + "s";
 
-            const timer = setInterval(() => {
-                timeLeft--;
-                if (timeLeft > 0) {
-                    closeBtn.innerText = timeLeft + "s";
-                } else {
-                    clearInterval(timer);
-                    activateCloseButton();
-                }
-            }, 1000);
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft > 0) {
+                        closeBtn.innerText = timeLeft + "s";
+                    } else {
+                        clearInterval(timer);
+                        activateCloseButton();
+                    }
+                }, 1000);
+            };
         }
 
         function activateCloseButton() {
@@ -266,16 +333,12 @@
             };
         }
 
-        // ==== Ajouts pour empêcher le zoom et le refresh ====
-
-        // Empêche le pinch zoom
         document.addEventListener('touchmove', function (e) {
             if (e.touches.length > 1) {
                 e.preventDefault();
             }
         }, { passive: false });
 
-        // Empêche le double-tap zoom
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function (e) {
             const now = Date.now();
@@ -285,23 +348,18 @@
             lastTouchEnd = now;
         }, true);
 
-        // Empêche le refresh (F5, Ctrl+R) et fermeture (Ctrl+W)
         document.addEventListener('keydown', function (e) {
-            // F5
             if (e.keyCode === 116) {
                 e.preventDefault();
             }
-            // Ctrl+R ou Ctrl+Shift+R
             if (e.ctrlKey && (e.keyCode === 82 || e.keyCode === 114)) {
                 e.preventDefault();
             }
-            // Ctrl+W ou Ctrl+Shift+W
             if (e.ctrlKey && (e.keyCode === 87)) {
                 e.preventDefault();
             }
         });
 
-        // Prompt à la tentative de refresh/fermeture
         window.addEventListener('beforeunload', function (e) {
             e.preventDefault();
             e.returnValue = '';
