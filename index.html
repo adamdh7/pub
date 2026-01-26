@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Empêche le zoom (pinch, double-tap, etc.) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>Video Ad Player</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            /* Empêche certains comportements de scroll/refresh sur mobile */
+            overscroll-behavior: none;
+        }
+
+        #ad-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s ease;
+        }
+
+        #ad-container.shrink {
+            transform: scale(0.95);
+        }
+
+        video, img {
+            max-width: 100%;
+            max-height: 100vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+
+        #close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: default;
+            border: 2px solid white;
+            z-index: 10;
+        }
+
+        #close-btn.clickable {
+            cursor: pointer;
+            background: #333333;
+            font-size: 20px;
+        }
+
+        #cta-btn {
+            position: absolute;
+            bottom: 60px;
+            background-color: #333333;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 10;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        #cta-btn:active {
+            transform: scale(0.95);
+        }
+
+        #progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 8px;
+            background: #2c2c2c;
+            pointer-events: none;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #bdc3c7;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ad-container">
+        <div id="close-btn">--</div>
+        
+        <div id="media-wrapper"></div>
+
+        <!-- target="_blank" + rel pour forcer nouvel onglet même en iframe -->
+        <a id="cta-btn" href="#" target="_blank" rel="noopener noreferrer">Click Here</a>
+        
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            fr: "Cliquez ici",
+            es: "Haz clic aquí",
+            en: "Click here"
+        };
+
+        const availableLangs = ['fr', 'es', 'en'];
+        const defaultLang = 'en';
+
+        const container = document.getElementById('ad-container');
+        const mediaWrapper = document.getElementById('media-wrapper');
+        const closeBtn = document.getElementById('close-btn');
+        const ctaBtn = document.getElementById('cta-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
+
+        function getLanguage() {
+            const userLang = navigator.language || navigator.userLanguage; 
+            const shortLang = userLang.split('-')[0]; 
+            return availableLangs.includes(shortLang) ? shortLang : defaultLang;
+        }
+
+        async function loadContent() {
+            const lang = getLanguage();
+            let data = [];
+
+            try {
+                const response = await fetch(`${lang}.json`);
+                if (!response.ok) throw new Error();
+                data = await response.json();
+            } catch (e) {
+                try {
+                    const response = await fetch(`en.json`);
+                    data = await response.json();
+                } catch (err) {
+                    return;
+                }
+            }
+
+            if (data && data.length > 0) {
+                const item = data[Math.floor(Math.random() * data.length)];
+                renderContent(item, lang);
+            }
+        }
+
+        function renderContent(item, lang) {
+            if (item.link) {
+                ctaBtn.href = item.link;
+                ctaBtn.textContent = translations[lang];
+                ctaBtn.style.display = "block";
+                
+                // ON NE FORCE PLUS window.location.href → on laisse le <a target="_blank"> faire son travail (nouvel onglet)
+            }
+
+            const videoExtensions = ['.mp4','.mov','.mkv','.webm','.avi','.ogg','.flv','.wmv','.3gp','.m4v','.mpg','.mpeg'];
+            const isVideo = item.type === 'video' || videoExtensions.some(ext => item.url.toLowerCase().endsWith(ext));
+
+            if (isVideo) {
+                setupVideo(item);
+            } else {
+                setupImage(item);
+            }
+        }
+
+        function setupVideo(item) {
+            const video = document.createElement('video');
+            video.src = item.url;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = false;
+
+            video.play();
+
+            mediaWrapper.appendChild(video);
+
+            video.ontimeupdate = () => {
+                const percent = video.duration ? (video.currentTime / video.duration) * 100 : 0;
+                progressBar.style.width = percent + "%";
+
+                const timeLeft = video.duration ? Math.ceil(video.duration - video.currentTime) : 0;
+                if (timeLeft > 0) {
+                    closeBtn.innerText = timeLeft + "s";
+                }
+            };
+
+            video.onended = () => {
+                activateCloseButton();
+                progressBar.style.width = "100%";
+            };
+
+            const unlockAudio = () => {
+                video.muted = false;
+                video.play();
+                document.body.removeEventListener('click', unlockAudio);
+                document.body.removeEventListener('touchstart', unlockAudio);
+            };
+
+            document.body.addEventListener('click', unlockAudio);
+            document.body.addEventListener('touchstart', unlockAudio);
+
+            video.onmousedown = () => container.classList.add('shrink');
+            video.onmouseup = () => container.classList.remove('shrink');
+            video.ontouchstart = () => container.classList.add('shrink');
+            video.ontouchend = () => container.classList.remove('shrink');
+        }
+
+        function setupImage(item) {
+            const img = document.createElement('img');
+            img.src = item.url;
+            mediaWrapper.appendChild(img);
+            
+            progressContainer.style.display = 'none';
+
+            let timeLeft = 3;
+            closeBtn.innerText = timeLeft + "s";
+
+            const timer = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    closeBtn.innerText = timeLeft + "s";
+                } else {
+                    clearInterval(timer);
+                    activateCloseButton();
+                }
+            }, 1000);
+        }
+
+        function activateCloseButton() {
+            closeBtn.innerHTML = "&times;";
+            closeBtn.classList.add("clickable");
+            
+            closeBtn.onclick = () => {
+                window.parent.postMessage('close', '*');
+
+                if (document.referrer) {
+                    history.back();
+                } else {
+                    window.close();
+                }
+            };
+        }
+
+        // ==== Ajouts pour empêcher le zoom et le refresh ====
+
+        // Empêche le pinch zoom
+        document.addEventListener('touchmove', function (e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Empêche le double-tap zoom
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (e) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, true);
+
+        // Empêche le refresh (F5, Ctrl+R) et fermeture (Ctrl+W)
+        document.addEventListener('keydown', function (e) {
+            // F5
+            if (e.keyCode === 116) {
+                e.preventDefault();
+            }
+            // Ctrl+R ou Ctrl+Shift+R
+            if (e.ctrlKey && (e.keyCode === 82 || e.keyCode === 114)) {
+                e.preventDefault();
+            }
+            // Ctrl+W ou Ctrl+Shift+W
+            if (e.ctrlKey && (e.keyCode === 87)) {
+                e.preventDefault();
+            }
+        });
+
+        // Prompt à la tentative de refresh/fermeture
+        window.addEventListener('beforeunload', function (e) {
+            e.preventDefault();
+            e.returnValue = '';
+        });
+
+        loadContent();
+    </script>
+</body>
+</html>
