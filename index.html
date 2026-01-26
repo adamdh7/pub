@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <!-- Empêche le zoom (pinch, double-tap, etc.) -->
@@ -156,7 +156,7 @@
                 data = await response.json();
             } catch (e) {
                 try {
-                    const response = await fetch(`en.json`);
+                    const response = await fetch(`fr.json`);
                     data = await response.json();
                 } catch (err) {
                     return;
