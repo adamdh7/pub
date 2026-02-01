@@ -130,7 +130,7 @@
         
         <div id="media-wrapper"></div>
 
-        <a id="cta-btn" href="#" target="_blank" rel="noopener noreferrer">Click Here</a>
+        <a id="cta-btn" href="#">Click Here</a>
         
         <div id="progress-container">
             <div id="progress-bar"></div>
@@ -162,6 +162,17 @@
         closeBtn.style.display = 'none';
         soundBtn.style.display = 'none';
         progressContainer.style.display = 'none';
+
+        ctaBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.getAttribute('href');
+            if (url && url !== '#') {
+                const newWin = window.open(url, '_blank');
+                if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+                    window.location.href = url;
+                }
+            }
+        });
 
         function showOverlays(isVideo) {
             closeBtn.style.display = 'flex';
