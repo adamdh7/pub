@@ -166,7 +166,7 @@
         function showOverlays(isVideo) {
             closeBtn.style.display = 'flex';
             soundBtn.style.display = isVideo ? 'flex' : 'none';
-            if (ctaBtn.href !== '#') {
+            if (ctaBtn.hasAttribute('href') && ctaBtn.getAttribute('href') !== '#') {
                 ctaBtn.style.display = 'block';
             }
             progressContainer.style.display = isVideo ? 'block' : 'none';
@@ -205,6 +205,8 @@
             if (item.link) {
                 ctaBtn.href = item.link;
                 ctaBtn.textContent = translations[lang];
+            } else {
+                ctaBtn.removeAttribute('href');
             }
 
             const videoExtensions = ['.mp4','.mov','.mkv','.webm','.avi','.ogg','.flv','.wmv','.3gp','.m4v','.mpg','.mpeg'];
@@ -240,6 +242,7 @@
 
             video.addEventListener('playing', () => {
                 if (!overlaysShown) {
+                    window.parent.postMessage('video_playing', '*');
                     showOverlays(true);
                     updateSoundIcon();
                     if (video.duration && !isNaN(video.duration)) {
@@ -302,6 +305,7 @@
             mediaWrapper.appendChild(img);
 
             img.onload = () => {
+                window.parent.postMessage('image_displayed', '*');
                 showOverlays(false);
                 let timeLeft = 3;
                 closeBtn.innerText = timeLeft + "s";
